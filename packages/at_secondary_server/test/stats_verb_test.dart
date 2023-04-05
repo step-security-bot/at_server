@@ -22,7 +22,9 @@ import 'notify_verb_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSecondaryKeyStore extends Mock implements SecondaryKeyStore {}
+
 class MockOutboundClientManager extends Mock implements OutboundClientManager {}
+
 class MockAtCacheManager extends Mock implements AtCacheManager {}
 
 void main() {
@@ -115,6 +117,36 @@ void main() {
               command, inbound, defaultVerbHandlerManager),
           throwsA(predicate((dynamic e) => e is UnAuthenticatedException)));
     });
+
+    test(
+        'A test to verify stats verb throws exception when an invalid regex is supplied to stats verb',
+        () async {
+      SecondaryKeyStoreManager keyStoreManager = await await setUpFunc(
+          '${Directory.current.path}/test/hive',
+          atsign: '@alice');
+      var atCommitLog = keyStoreManager.getKeyStore().commitLog;
+
+      var verb = Stats();
+      var command = 'stats:3:buzz)';
+      var regex = verb.syntax();
+      var verbParams = getVerbParam(regex, command);
+      var inboundConnection = InboundConnectionImpl(null, '123');
+      inboundConnection.metaData = InboundConnectionMetadata()
+        ..isAuthenticated = true;
+      LastCommitIDMetricImpl.getInstance().atCommitLog = atCommitLog;
+      await (atCommitLog as AtCommitLog)
+          .commit('@bob:phone.buzz@alice', CommitOp.UPDATE);
+
+      var statsVerbHandler = StatsVerbHandler(keyStoreManager.getKeyStore());
+      var response = Response();
+      expect(
+          () async => await statsVerbHandler.processVerb(
+              response, verbParams, inboundConnection),
+          throwsA(predicate((dynamic e) =>
+              e is IllegalArgumentException &&
+              (e.message == response.errorMessage) &&
+              (response.isError == true))));
+    });
   });
   group('A group of notificationStats verb tests', () {
     SecondaryKeyStoreManager? keyStoreManager;
@@ -157,8 +189,8 @@ void main() {
         },
         'createdOn': 0,
       };
-      var notifyListVerbHandler =
-          NotifyListVerbHandler(keyStoreManager!.getKeyStore(), mockOutboundClientManager);
+      var notifyListVerbHandler = NotifyListVerbHandler(
+          keyStoreManager!.getKeyStore(), mockOutboundClientManager);
       var testNotification = (AtNotificationBuilder()
             ..id = '1031'
             ..fromAtSign = '@bob'
@@ -418,8 +450,8 @@ void main() {
       expect(
           decodedData[AtCompactionConstants.postCompactionEntriesCount], '1');
       expect(decodedData[AtCompactionConstants.preCompactionEntriesCount], '1');
-      expect(
-          decodedData[AtCompactionConstants.compactionDurationInMills], '10000');
+      expect(decodedData[AtCompactionConstants.compactionDurationInMills],
+          '10000');
     });
   });
 }

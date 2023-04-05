@@ -148,7 +148,7 @@ class StatsVerbHandler extends AbstractVerbHandler {
     } catch (exception) {
       response.isError = true;
       response.errorMessage = exception.toString();
-      return;
+      throw IllegalArgumentException(response.errorMessage);
     }
   }
 
