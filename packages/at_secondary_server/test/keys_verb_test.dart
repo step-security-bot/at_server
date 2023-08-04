@@ -715,7 +715,6 @@ void main() {
       var keysGetCommand = 'keys:get:self';
       await keysVerbHandler.process(keysGetCommand, inboundConnection);
       var keysList = decodeResponseAsList(inboundConnection.lastWrittenData!);
-      print('keysList in first connection : $keysList');
       expect(keysList, isNotEmpty);
       expect(keysList[0],
           '$enrollId.$defaultSelfEncryptionKey.$enrollManageNamespace@alice');
@@ -727,11 +726,25 @@ void main() {
       inboundConnection.metadata.isAuthenticated = true;
       inboundConnection.metadata.authType = AuthType.cram;
       inboundConnection.metadata.sessionID = 'session_2';
-      
+       enrollId = Uuid().v4();
+      inboundConnection.metadata.enrollmentId = enrollId;
+      enrollJson = {
+        'sessionId': '456',
+        'appName': 'buzz',
+        'deviceName': 'lg',
+        'namespaces': {'name': 'buzz', 'access': 'rw'},
+        'apkamPublicKey': 'selfkeyvalue',
+        'requestType': 'newEnrollment',
+        'approval': {'state': 'approved'}
+      };
+      keyName = '$enrollId.new.enrollments.__manage@alice';
+      await secondaryKeyStore.put(
+          keyName, AtData()..data = jsonEncode(enrollJson));
+
       keysGetCommand = 'keys:get:self';
       await keysVerbHandler.process(keysGetCommand, inboundConnection);
       keysList = decodeResponseAsList(inboundConnection.lastWrittenData!);
-      print('keysList in second connection : $keysList');
+      expect(keysList.contains('__manage'), false);
 
     });
 
