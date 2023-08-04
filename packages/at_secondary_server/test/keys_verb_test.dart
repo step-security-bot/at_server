@@ -2,11 +2,13 @@ import 'dart:convert';
 
 import 'package:at_commons/at_commons.dart';
 import 'package:at_persistence_secondary_server/at_persistence_secondary_server.dart';
+import 'package:at_secondary/src/connection/inbound/dummy_inbound_connection.dart';
 import 'package:at_secondary/src/constants/enroll_constants.dart';
 import 'package:at_secondary/src/server/at_secondary_impl.dart';
 import 'package:at_secondary/src/utils/handler_util.dart';
 import 'package:at_secondary/src/verb/handler/keys_verb_handler.dart';
 import 'package:at_secondary/src/verb/handler/local_lookup_verb_handler.dart';
+import 'package:at_server_spec/at_server_spec.dart';
 import 'package:at_server_spec/at_verb_spec.dart';
 import 'package:at_utils/at_logger.dart';
 import 'package:test/test.dart';
@@ -679,6 +681,58 @@ void main() {
       expect(keysList, isNotEmpty);
       expect(keysList[0],
           '$enrollId.$defaultSelfEncryptionKey.$enrollManageNamespace@alice');
+    });
+
+    test(
+        'keys get verb- which does not have __manage namespace access',
+        () async {
+      inboundConnection.metadata.isAuthenticated =
+          true; // owner connection, authenticated
+      inboundConnection.metadata.sessionID = 'session_1';
+      var enrollId = Uuid().v4();
+      inboundConnection.metadata.enrollmentId = enrollId;
+      var enrollJson = {
+        'sessionId': '123',
+        'appName': 'wavi',
+        'deviceName': 'pixel',
+        'namespaces': {'name': 'wavi', 'access': 'rw'},
+        'apkamPublicKey': 'testPublicKeyValue',
+        'requestType': 'newEnrollment',
+        'approval': {'state': 'approved'}
+      };
+      var keyName = '$enrollId.new.enrollments.__manage@alice';
+      await secondaryKeyStore.put(
+          keyName, AtData()..data = jsonEncode(enrollJson));
+
+      var encryptedSelfEncryptionKey =
+          'N0bmvnW1k5oKL+/6X3HresMyG/z6yBmxzgtrn8CMEofWgxJo8RSBXIqvdNj9ZOHO';
+      var valueJson = {};
+      valueJson['value'] = encryptedSelfEncryptionKey;
+      await secondaryKeyStore.put(
+          '$enrollId.$defaultSelfEncryptionKey.$enrollManageNamespace@alice',
+          AtData()..data = jsonEncode(valueJson));
+
+      var keysGetCommand = 'keys:get:self';
+      await keysVerbHandler.process(keysGetCommand, inboundConnection);
+      var keysList = decodeResponseAsList(inboundConnection.lastWrittenData!);
+      print('keysList in first connection : $keysList');
+      expect(keysList, isNotEmpty);
+      expect(keysList[0],
+          '$enrollId.$defaultSelfEncryptionKey.$enrollManageNamespace@alice');
+
+      await inboundConnection.close();
+      inboundConnection = DummyInboundConnection();
+
+      //  second connection
+      inboundConnection.metadata.isAuthenticated = true;
+      inboundConnection.metadata.authType = AuthType.cram;
+      inboundConnection.metadata.sessionID = 'session_2';
+      
+      keysGetCommand = 'keys:get:self';
+      await keysVerbHandler.process(keysGetCommand, inboundConnection);
+      keysList = decodeResponseAsList(inboundConnection.lastWrittenData!);
+      print('keysList in second connection : $keysList');
+
     });
 
     test('keys verb invalid syntax - invalid operation', () {
