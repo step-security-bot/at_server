@@ -1,4 +1,4 @@
-FROM atsigncompany/vebase:latest
+FROM atsigncompany/vebase:latest@sha256:b57a60a3273821fb2ac4cfa514f13b4e2f9a5c8dd169f39fc9adb96a5d62ff3f
 USER root
 
 # Secondary binary will be put in place by GitHub Actions
